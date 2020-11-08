@@ -1,0 +1,22 @@
+[Unit]
+Description={{ portainer.shortName }} Container
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=infinity
+Restart=always
+ExecStartPre=-/usr/bin/docker stop %n
+ExecStartPre=-/usr/bin/docker rm %n
+ExecStartPre=/usr/bin/docker pull {{ portainer.fullName}}:{{ portainer.tag }}
+ExecStart=/usr/bin/docker run --rm --name %n \
+    --network {{ dockerNetworkName }} \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v portainer_data:/data \
+    --env "VIRTUAL_PORT=9000" \
+    --env "VIRTUAL_HOST={{ portainer.shortName }}.{{ baseHost }}" \
+    --env "LETSENCRYPT_HOST={{ portainer.shortName }}.{{ baseHost }}" \
+    {{ portainer.fullName}}:{{ portainer.tag }}
+
+[Install]
+WantedBy=multi-user.target

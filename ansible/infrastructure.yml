@@ -1,0 +1,438 @@
+[
+  {
+    "hosts": "servers",
+    "become": true,
+    "vars_files": ["vars/vars.yml", "vars/secret_vars.yml"],
+    "tasks": [
+        {
+          "name": "Install aptitude using apt",
+          "apt": "name=aptitude state=latest update_cache=yes force_apt_get=yes",
+        },
+        {
+          "name": "Install required system packages",
+          "apt":
+            {
+              "name": "{{ item }}",
+              "state": "latest",
+              "update_cache": "yes",
+              "cache_valid_time": 60,
+            },
+          "loop":
+            [
+              "apt-transport-https",
+              "ca-certificates",
+              "curl",
+              "software-properties-common",
+              "gnupg-agent",
+              "python3-pip",
+              "virtualenv",
+              "python3-setuptools",
+            ],
+        },
+        {
+          "name": "Add Docker GPG apt Key",
+          "apt_key":
+            {
+              "url": "https://download.docker.com/linux/ubuntu/gpg",
+              "state": "present",
+            },
+        },
+        {
+          "name": "Add Docker Repository",
+          "apt_repository":
+            {
+              "repo": "deb https://download.docker.com/linux/ubuntu focal stable",
+              "state": "present",
+            },
+        },
+        {
+          "name": "Install required docker packages",
+          "apt":
+            {
+              "name": "{{ item }}",
+              "state": "latest",
+              "update_cache": "yes",
+              "cache_valid_time": 60,
+            },
+          "loop": ["docker-ce", "docker-ce-cli", "containerd.io"],
+        },
+        {
+          "name": "Update apt and install docker-ce",
+          "apt": "update_cache=yes name=docker-ce state=latest",
+        },
+        {
+          "name": "Install Python Modules",
+          "pip": { "name": "{{item}}" },
+          "loop": ["docker", "pymongo", "psycopg2-binary"],
+        },
+        {
+          "name": "DockerEngine Managed by systemd",
+          "systemd": { "name": "docker", "enabled": "yes", "state": "started" },
+        },
+        # Start Simulation Pre-reqs
+        {
+          "name": "Build Bridge Docker Network",
+          "docker_network":
+            { "name": "{{ dockerNetworkName }}", "driver": "bridge" },
+        },
+        {
+          "name": "Pull nginx Reverse Proxy Docker images",
+          "docker_image":
+            { "name": "{{ item }}", "source": "pull", "state": "present" },
+          "loop":
+            [
+              "{{nginx_proxy.fullName}}:{{nginx_proxy.tag}}",
+              "{{letsencrypt_nginx_proxy_companion.fullName}}:{{letsencrypt_nginx_proxy_companion.tag}}",
+            ],
+        },
+        {
+          "name": "Add nginx-proxy to systemd",
+          "template":
+            {
+              "src": "./systemd_configs/nginx_proxy_systemd_conf.j2",
+              "dest": "/etc/systemd/system/docker.{{nginx_proxy.shortName}}.service",
+            },
+          "notify": "nginx-proxy config change",
+        },
+        {
+          "name": "Add letsencrypt_nginx_proxy_companion to systemd",
+          "template":
+            {
+              "src": "./systemd_configs/letsencrypt_companion_conf.j2",
+              "dest": "/etc/systemd/system/docker.{{letsencrypt_nginx_proxy_companion.shortName}}.service",
+            },
+          "notify": "letsencrypt config change",
+        },
+        {
+          "name": "Enabled nginx and nginx-proxy and letsencrypt by systemd",
+          "systemd":
+            { "name": "docker.{{item}}", "enabled": "yes", "state": "started" },
+          "loop":
+            [
+              "{{nginx_proxy.shortName}}",
+              "{{letsencrypt_nginx_proxy_companion.shortName}}",
+            ],
+          "notify": ["nginx-proxy config change", "letsencrypt config change"],
+        },
+        # Start Monitoring Tools
+        {
+          "name": "Pull Portainer Docker images",
+          "docker_image":
+            {
+              "name": "{{ portainer.fullName }}:{{ portainer.tag }}",
+              "source": "pull",
+              "state": "present",
+            },
+          "notify": "portainer config change",
+        },
+        {
+          "name": "Add Portainer to systemd",
+          "template":
+            {
+              "src": "./systemd_configs/portainer_conf.j2",
+              "dest": "/etc/systemd/system/docker.{{ portainer.shortName }}.service",
+            },
+          "notify": "portainer config change",
+        },
+        {
+          "name": "Enable Portainer by systemd",
+          "systemd":
+            {
+              "name": "docker.{{ portainer.shortName }}",
+              "enabled": "yes",
+              "state": "started",
+            },
+          "notify": "portainer config change",
+        },
+        {
+          "name": "Install cockpit-project",
+          "apt":
+            {
+              "name": "cockpit",
+              "state": "latest",
+              "update_cache": "yes",
+              "cache_valid_time": 60,
+            },
+          "loop": ["cockpit", "cockpit-docker"],
+        },
+        # Start Elastic Search
+        {
+          "name": "Pull ElasticSearch Docker images",
+          "docker_image":
+            {
+              "name": "{{ elasticsearch.fullName }}:{{ elasticsearch.tag }}",
+              "source": "pull",
+              "state": "present",
+            },
+          "notify": "elasticsearch config change",
+        },
+        {
+          "name": "Add ElasticSearch to systemd",
+          "template":
+            {
+              "src": "./systemd_configs/elasticsearch_systemd_conf.j2",
+              "dest": "/etc/systemd/system/docker.{{ elasticsearch.shortName }}.service",
+            },
+          "notify": "elasticsearch config change",
+        },
+        {
+          "name": "Enable ElasticSearch by systemd",
+          "systemd":
+            {
+              "name": "docker.{{ elasticsearch.shortName }}",
+              "enabled": "yes",
+              "state": "started",
+            },
+          "notify": "elasticsearch config change",
+        },
+        # Start Kibani Search
+        {
+          "name": "Pull Kibana Docker images",
+          "docker_image":
+            {
+              "name": "{{ kibana.fullName }}:{{ kibana.tag }}",
+              "source": "pull",
+              "state": "present",
+            },
+          "notify": "kibana config change",
+        },
+        {
+          "name": "Add Kibana to systemd",
+          "template":
+            {
+              "src": "./systemd_configs/kibana_systemd_conf.j2",
+              "dest": "/etc/systemd/system/docker.{{ kibana.shortName }}.service",
+            },
+          "notify": "kibana config change",
+        },
+        {
+          "name": "Enable Kibana by systemd",
+          "systemd":
+            {
+              "name": "docker.{{ kibana.shortName }}",
+              "enabled": "yes",
+              "state": "started",
+            },
+          "notify": "kibana config change",
+        },
+        # Start Fluentd Search
+        {
+          "name": "Pull Fluentd Docker images",
+          "docker_image":
+            {
+              "name": "{{ fluentd.fullName }}:{{ fluentd.tag }}",
+              "source": "pull",
+              "state": "present",
+            },
+          "notify": "fluentd config change",
+        },
+        {
+          "name": "Ensure tmp directory exists",
+          "file":
+            {
+              "path": "/tmp/fluentd_configs/",
+              "state": "directory",
+              "recurse": "yes",
+            },
+        },
+        {
+          "name": "Copy Fluent Configs to server",
+          "template":
+            {
+              "src": "./fluentd_configs/{{item}}",
+              "dest": "/tmp/fluentd_configs/{{item}}",
+            },
+          "loop": ["fluent.conf", "fluentd.dockerfile"],
+          "register": "fluent_copy",
+        },
+        {
+          "name": "Stop Fluentd Service",
+          "systemd":
+            {
+              "name": "docker.{{fluentd.shortName}}",
+              "enabled": "no",
+              "state": "stopped",
+              "daemon_reload": "yes",
+            },
+          "when": "fluent_copy.changed",
+        },
+        {
+          "name": "Remove all elastic_fluentd images","community.general.docker_image":
+            {
+              "name": "elastic_fluentd",
+              "state": "absent",
+              "force_absent": "yes"
+          },
+          "when": "fluent_copy.changed",
+        },
+        {
+          "name": "Build Fluentd Docker Image",
+          "community.general.docker_image":
+            {
+              "name": "elastic_fluentd",
+              "source": "build",
+              "build":
+                {
+                  "dockerfile": "/tmp/fluentd_configs/fluentd.dockerfile",
+                  "path": "/tmp/fluentd_configs/",
+                  "pull": "yes",
+                },
+              "tag": "latest",
+            },
+          "when": "fluent_copy.changed",
+        },
+        {
+          "name": "Add Fluentd to systemd",
+          "template":
+            {
+              "src": "./systemd_configs/fluentd_systemd_conf.j2",
+              "dest": "/etc/systemd/system/docker.{{ fluentd.shortName }}.service",
+            },
+          "notify": "fluentd config change",
+        },
+        {
+          "name": "Enable Fluentd by systemd",
+          "systemd":
+            {
+              "name": "docker.{{ fluentd.shortName }}",
+              "enabled": "yes",
+              "state": "started",
+            },
+          "notify": "fluentd config change",
+        },
+        # Start Postgres
+        {
+          "name": "Pull Postgres Docker images",
+          "docker_image":
+            {
+              "name": "{{ postgres.fullName }}:{{ postgres.tag }}",
+              "source": "pull",
+              "state": "present",
+            },
+          "notify": "postgres config change",
+        },
+        {
+          "name": "Add Postgres to systemd",
+          "template":
+            {
+              "src": "./systemd_configs/postgres_systemd_conf.j2",
+              "dest": "/etc/systemd/system/docker.{{ postgres.shortName }}.service",
+            },
+          "notify": "postgres config change",
+        },
+        {
+          "name": "Enable Postgres by systemd",
+          "systemd":
+            {
+              "name": "docker.{{ postgres.shortName }}",
+              "enabled": "yes",
+              "state": "started",
+            },
+          "notify": "postgres config change",
+        },
+      ],
+    "handlers":
+      [
+        {
+          "name": "Restart Apps",
+          "systemd":
+            {
+              "name": "docker.{{item.value.shortName}}",
+              "enabled": "yes",
+              "state": "restarted",
+              "daemon_reload": "yes",
+            },
+          "loop": "{{ applications | dict2items }}",
+          "listen": "systemd config change",
+        },
+        {
+          "name": "Restart postgres",
+          "systemd":
+            {
+              "name": "docker.{{postgres.shortName}}",
+              "enabled": "yes",
+              "state": "restarted",
+              "daemon_reload": "yes",
+            },
+          "listen": "postgres config change",
+        },
+        {
+          "name": "Restart elasticsearch",
+          "systemd":
+            {
+              "name": "docker.{{elasticsearch.shortName}}",
+              "enabled": "yes",
+              "state": "restarted",
+              "daemon_reload": "yes",
+            },
+          "listen": "elasticsearch config change",
+        },
+        {
+          "name": "Restart kibana",
+          "systemd":
+            {
+              "name": "docker.{{kibana.shortName}}",
+              "enabled": "yes",
+              "state": "restarted",
+              "daemon_reload": "yes",
+            },
+          "listen": "kibana config change",
+        },
+        {
+          "name": "Restart nginx-proxy",
+          "systemd":
+            {
+              "name": "docker.{{nginx_proxy.shortName}}",
+              "enabled": "yes",
+              "state": "restarted",
+              "daemon_reload": "yes",
+            },
+          "listen": "nginx-proxy config change",
+        },
+        {
+          "name": "Restart letsencrypt_nginx_proxy_companion",
+          "systemd":
+            {
+              "name": "docker.{{letsencrypt_nginx_proxy_companion.shortName}}",
+              "enabled": "yes",
+              "state": "restarted",
+              "daemon_reload": "yes",
+            },
+          "listen": "letsencrypt config change",
+        },
+        {
+          "name": "Restart Portainer",
+          "systemd":
+            {
+              "name": "docker.{{portainer.shortName}}",
+              "enabled": "yes",
+              "state": "restarted",
+              "daemon_reload": "yes",
+            },
+          "listen": "portainer config change",
+        },
+        {
+          "name": "Restart Fluentd",
+          "systemd":
+            {
+              "name": "docker.{{fluentd.shortName}}",
+              "enabled": "yes",
+              "state": "restarted",
+              "daemon_reload": "yes",
+            },
+          "listen": "fluentd config change",
+        },
+        {
+          "name": "Restart Docker",
+          "systemd":
+            {
+              "name": "docker",
+              "enabled": "yes",
+              "state": "restarted",
+              "daemon_reload": "yes",
+            },
+          "listen": "docker config change",
+        },
+      ],
+  },
+]

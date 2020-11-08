@@ -1,0 +1,21 @@
+[Unit]
+Description={{ kibana.shortName }} Container
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=infinity
+Restart=always
+ExecStartPre=-/usr/bin/docker stop %n
+ExecStartPre=-/usr/bin/docker rm %n
+ExecStartPre=/usr/bin/docker pull {{ kibana.fullName}}:{{ kibana.tag }}
+ExecStart=/usr/bin/docker run --rm --name %n \
+    --network {{ dockerNetworkName }} \
+    --link docker.{{ elasticsearch.shortName }}.service:elasticsearch \
+    --env "VIRTUAL_PORT=5601" \
+    --env "VIRTUAL_HOST={{ kibana.shortName }}.{{ baseHost }}" \
+    --env "LETSENCRYPT_HOST={{ kibana.shortName }}.{{ baseHost }}" \
+    {{ kibana.fullName}}:{{ kibana.tag }}
+
+[Install]
+WantedBy=multi-user.target

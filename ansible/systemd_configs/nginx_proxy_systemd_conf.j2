@@ -1,0 +1,23 @@
+[Unit]
+Description=nginx_proxy Container
+After=docker.service
+Requires=docker.service
+
+[Service] 
+TimeoutStartSec=infinity
+Restart=always
+ExecStartPre=-/usr/bin/docker stop %n
+ExecStartPre=-/usr/bin/docker rm %n
+ExecStartPre=/usr/bin/docker pull {{ nginx_proxy.fullName }}:{{ nginx_proxy.tag }}
+ExecStart=/usr/bin/docker run --name %n \
+    --network {{ dockerNetworkName }} \
+    -p 80:80 \
+    -p 443:443 \
+    --volume certs:/etc/nginx/certs \
+    --volume vhost:/etc/nginx/vhost.d \
+    --volume html:/usr/share/nginx/html \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
+    {{ nginx_proxy.fullName }}:{{ nginx_proxy.tag }}
+
+[Install]
+WantedBy=multi-user.target

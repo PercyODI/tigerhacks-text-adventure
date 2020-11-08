@@ -1,0 +1,21 @@
+[Unit]
+Description=letsencrypt_nginx_proxy_companion Container
+After=docker.service
+Requires=docker.service
+After=docker.{{nginx_proxy.shortName}}.service
+Requires=docker.{{nginx_proxy.shortName}}.service
+
+[Service] 
+TimeoutStartSec=infinity
+Restart=always
+ExecStartPre=-/usr/bin/docker stop %n
+ExecStartPre=-/usr/bin/docker rm %n
+ExecStartPre=/usr/bin/docker pull {{ letsencrypt_nginx_proxy_companion.fullName }}:{{ letsencrypt_nginx_proxy_companion.tag }}
+ExecStart=/usr/bin/docker run --name %n \
+    --network {{ dockerNetworkName }} \
+    --volumes-from docker.{{nginx_proxy.shortName}}.service \
+    --volume /var/run/docker.sock:/var/run/docker.sock:ro \
+    {{ letsencrypt_nginx_proxy_companion.fullName }}:{{ letsencrypt_nginx_proxy_companion.tag }}
+
+[Install]
+WantedBy=multi-user.target

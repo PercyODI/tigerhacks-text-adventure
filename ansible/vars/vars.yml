@@ -1,0 +1,36 @@
+---
+dockerNetworkName: text_adventure_network
+frontendApp: 
+    fullName: textadventuresim/textadventuresim.app
+    tag: "0.0.2"
+    shortName: app
+nginx_proxy:
+  fullName: jwilder/nginx-proxy
+  shortName: nginx-proxy
+  tag: latest
+letsencrypt_nginx_proxy_companion:
+  fullName: jrcs/letsencrypt-nginx-proxy-companion
+  shortName: letsencrypt-nginx-proxy-companion
+  tag: v1.13.1
+portainer:
+  fullName: portainer/portainer-ce
+  shortName: portainer
+  tag: "2.0.0"
+postgres:
+  fullName: postgres
+  shortName: postgres
+  tag: "13-alpine"
+elasticsearch:
+  fullName: docker.elastic.co/elasticsearch/elasticsearch
+  shortName: elasticsearch
+  tag: "7.9.3"
+kibana:
+  fullName: docker.elastic.co/kibana/kibana
+  shortName: kibana
+  tag: "7.9.3"
+fluentd:
+  fullName: fluent/fluentd
+  shortName: fluentd
+  tag: "v1.11-debian-1"
+
+  

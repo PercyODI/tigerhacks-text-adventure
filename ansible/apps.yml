@@ -1,0 +1,33 @@
+
+        # Start Simulation Applications
+        {
+          "name": "Pull Application Docker images",
+          "docker_image":
+            {
+              "name": "{{ item.value.fullName }}",
+              "tag": "{{ item.value.tag }}",
+              "source": "pull",
+              "state": "present",
+            },
+          "loop": "{{ applications | dict2items }}",
+        },
+        {
+          "name": "Add App to systemd",
+          "template":
+            {
+              "src": "./systemd_configs/application_systemd_conf.j2",
+              "dest": "/etc/systemd/system/docker.{{item.value.shortName}}.service",
+            },
+          "loop": "{{ applications | combine(applicationCreds, recursive=True) | dict2items }}",
+          "notify": "systemd config change",
+        },
+        {
+          "name": "Apps Enabled by systemd",
+          "systemd":
+            {
+              "name": "docker.{{item.value.shortName}}",
+              "enabled": "yes",
+              "state": "started",
+            },
+          "loop": "{{ applications | dict2items }}",
+        },

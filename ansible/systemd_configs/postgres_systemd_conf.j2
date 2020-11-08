@@ -1,0 +1,23 @@
+[Unit]
+Description={{ postgres.shortName }} Container
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=infinity
+Restart=always
+ExecStartPre=-/usr/bin/docker stop %n
+ExecStartPre=-/usr/bin/docker rm %n
+ExecStartPre=/usr/bin/docker pull {{ postgres.fullName}}:{{ postgres.tag }}
+ExecStart=/usr/bin/docker run --rm --name %n \
+    --network {{ dockerNetworkName }} \
+    -p 5432:5432 \
+    --env "VIRTUAL_HOST={{ postgres.shortName }}.{{ baseHost }}" \
+    --env "LETSENCRYPT_HOST={{ postgres.shortName }}.{{ baseHost }}" \
+    --volume postgres_data:/var/lib/postgresql/data \
+    --env "POSTGRES_USER={{postgresCreds.rootUser}}" \
+    --env "POSTGRES_PASSWORD={{postgresCreds.rootPass}}" \
+    {{ postgres.fullName}}:{{ postgres.tag }}
+
+[Install]
+WantedBy=multi-user.target

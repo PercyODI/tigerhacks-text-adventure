@@ -1,0 +1,56 @@
+[
+  {
+    "hosts": "servers",
+    "become": true,
+    "vars_files": ["vars/vars.yml", "vars/secret_vars.yml"],
+    "tasks": [
+        {
+          "name": "Set front-end variable",
+          "set_fact": { "appDict": "{{ frontendApp }}" },
+        },
+        # Start Simulation Applications
+        {
+          "name": "Pull Application Docker images",
+          "docker_image":
+            {
+              "name": "{{ appDict.fullName }}",
+              "tag": "{{ appDict.tag }}",
+              "source": "pull",
+              "state": "present",
+            },
+        },
+        {
+          "name": "Add App to systemd",
+          "template":
+            {
+              "src": "./systemd_configs/exposed_application_systemd_conf.j2",
+              "dest": "/etc/systemd/system/docker.{{appDict.shortName}}.service",
+            },
+          "notify": "systemd config change",
+        },
+        {
+          "name": "Apps Enabled by systemd",
+          "systemd":
+            {
+              "name": "docker.{{appDict.shortName}}",
+              "enabled": "yes",
+              "state": "started",
+            },
+        },
+      ],
+    "handlers":
+      [
+        {
+          "name": "Restart Frontend",
+          "systemd":
+            {
+              "name": "docker.{{appDict.shortName}}",
+              "enabled": "yes",
+              "state": "restarted",
+              "daemon_reload": "yes",
+            },
+          "listen": "systemd config change",
+        },
+      ],
+  },
+]

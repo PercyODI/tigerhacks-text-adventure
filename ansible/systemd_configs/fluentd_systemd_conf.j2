@@ -1,0 +1,18 @@
+[Unit]
+Description={{ fluentd.shortName }} Container
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=infinity
+Restart=always
+ExecStartPre=-/usr/bin/docker stop %n
+ExecStartPre=-/usr/bin/docker rm %n
+ExecStart=/usr/bin/docker run --rm --name %n \
+    --network {{ dockerNetworkName }} \
+    --volume /var/run/docker.sock:/var/run/docker.sock:ro \
+    --volume /var/lib/docker/containers:/var/lib/docker/containers \
+    elastic_fluentd:latest
+
+[Install]
+WantedBy=multi-user.target
